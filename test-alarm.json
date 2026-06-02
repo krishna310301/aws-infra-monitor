@@ -1,13 +1,13 @@
 {
   "AlarmName": "aws-infra-monitor-high-cpu-alarm",
   "AlarmDescription": "Triggers when monitored EC2 CPU exceeds threshold",
-  "AWSAccountId": "196750375574",
+  "AWSAccountId": "123456789012",
   "NewStateValue": "ALARM",
   "OldStateValue": "OK",
   "NewStateReason": "Threshold Crossed: 2 out of the last 2 datapoints [94.2, 91.8] were greater than the threshold (70.0).",
   "StateChangeTime": "2026-06-02T20:45:00.000+0000",
   "Region": "US East (N. Virginia)",
-  "AlarmArn": "arn:aws:cloudwatch:us-east-1:196750375574:alarm:aws-infra-monitor-high-cpu-alarm",
+  "AlarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:aws-infra-monitor-high-cpu-alarm",
   "Trigger": {
     "MetricName": "CPUUtilization",
     "Namespace": "AWS/EC2",
@@ -17,7 +17,7 @@
     "Dimensions": [
       {
         "name": "InstanceId",
-        "value": "i-043fba9bacc3b9267"
+        "value": "i-0123456789abcdef0"
       }
     ],
     "Period": 60,
