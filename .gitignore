@@ -1,0 +1,11 @@
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfvars
+*.zip
+__pycache__/
+*.pyc
+evidence/
+screenshots/
+evidence/
+screenshots/
