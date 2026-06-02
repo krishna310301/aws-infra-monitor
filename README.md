@@ -105,7 +105,7 @@ terraform validate
 
 - Terraform state files and local variable files are excluded from version control.
 - The Lambda IAM role uses scoped permissions for CloudWatch Logs and SNS publishing.
-- Bedrock invocation permissions can be further restricted to a specific inference profile ARN in a production setup.
+- - Bedrock invocation is scoped to the configured inference profile and foundation model. AWS Marketplace read/subscribe permissions are included because Anthropic Bedrock models may require Marketplace-backed access activation in some AWS accounts.
 - Screenshots and local validation evidence are not committed to avoid exposing account-specific details.
 
 ## Future Improvements
