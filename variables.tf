@@ -27,6 +27,18 @@ variable "cpu_alarm_threshold" {
   default     = 70
 }
 
+variable "enable_startup_cpu_stress" {
+  description = "Run a temporary CPU load loop on instance boot to trigger the CloudWatch alarm for demo validation"
+  type        = bool
+  default     = false
+}
+
+variable "startup_cpu_stress_seconds" {
+  description = "Duration in seconds for optional startup CPU load"
+  type        = number
+  default     = 300
+}
+
 variable "bedrock_model_id" {
   description = "Amazon Bedrock model ID used for incident summary generation"
   type        = string

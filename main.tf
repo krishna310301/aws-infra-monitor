@@ -29,6 +29,14 @@ data "aws_caller_identity" "current" {}
 locals {
   bedrock_inference_profile_arn = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.bedrock_model_id}"
   bedrock_foundation_model_arn  = "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
+  startup_cpu_stress_user_data  = <<-EOT
+    #!/bin/bash
+    set -euo pipefail
+    end_time=$((SECONDS + ${var.startup_cpu_stress_seconds}))
+    while [ "$SECONDS" -lt "$end_time" ]; do
+      : > /dev/null
+    done
+  EOT
 }
 
 resource "aws_security_group" "ec2_sg" {
@@ -56,6 +64,7 @@ resource "aws_instance" "monitored_ec2" {
   subnet_id                   = data.aws_subnets.default.ids[0]
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   associate_public_ip_address = true
+  user_data                   = var.enable_startup_cpu_stress ? local.startup_cpu_stress_user_data : null
 
   metadata_options {
     http_tokens = "required"
