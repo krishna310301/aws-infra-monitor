@@ -9,11 +9,12 @@ This project connects my production operations background with cloud-native inci
 - Monitors EC2 CPU utilization with Amazon CloudWatch alarms
 - Sends alarm state changes to an SNS trigger topic
 - Invokes a Python Lambda incident handler
+- Calculates deterministic severity from alarm state, threshold, and current value before the Bedrock step
 - Calls Amazon Bedrock to generate a remediation-focused triage summary
 - Publishes the final incident notification through a separate SNS email topic
 - Stores Lambda execution logs in CloudWatch Logs
 - Provisions the full workflow with Terraform
-- Runs Lambda unit tests and Terraform validation in GitHub Actions
+- Runs Lambda unit tests, Terraform validation, Bandit, and Checkov in GitHub Actions
 
 ## Architecture
 
@@ -22,6 +23,7 @@ flowchart TD
     ec2["EC2 monitored instance"] -->|"CPUUtilization"| alarm["CloudWatch alarm"]
     alarm -->|"ALARM / OK state change"| trigger["SNS alarm trigger topic"]
     trigger -->|"Lambda subscription"| lambda["Incident handler Lambda"]
+    lambda -->|"Severity mapping + fallback template"| severity["Deterministic triage logic"]
     lambda -->|"Invoke model"| bedrock["Amazon Bedrock Claude Haiku"]
     lambda -->|"Execution logs"| logs["CloudWatch Logs"]
     lambda -->|"Formatted incident summary"| notify["SNS notification topic"]
@@ -37,7 +39,7 @@ flowchart TD
 | Messaging | Amazon SNS |
 | Triage summary | Amazon Bedrock Claude Haiku |
 | Infrastructure | Terraform |
-| Validation | GitHub Actions, Python unit tests |
+| Validation | GitHub Actions, Python unit tests, Bandit, Checkov |
 
 ## Repository Structure
 
@@ -47,6 +49,8 @@ flowchart TD
 │   └── incident_handler.py
 ├── tests/
 │   └── test_incident_handler.py
+├── docs/
+│   └── runbook.md
 ├── assets/
 │   └── bedrock-incident-email.png
 ├── .github/workflows/
@@ -64,12 +68,13 @@ flowchart TD
 The Lambda function:
 
 - Extracts alarm name, metric, threshold, state, instance ID, region, timestamp, and current datapoint from the CloudWatch alarm payload
+- Maps severity deterministically before calling Bedrock, so notifications still have useful triage context during model failures
 - Prompts Bedrock to produce a concise summary, likely cause, immediate actions, and severity
 - Rejects short or generic model responses and falls back to a deterministic incident template
 - Sends a final incident email through SNS
 - Sends a fallback failure notification if alarm processing fails
 
-## Demo Modes
+## Validation Modes
 
 ### Safe Manual Test
 
@@ -84,7 +89,7 @@ aws sns publish \
 
 ### Real CloudWatch Alarm Test
 
-For a short demo, enable the optional startup CPU load loop:
+For a short validation run, enable the optional startup CPU load loop:
 
 ```hcl
 enable_startup_cpu_stress  = true
@@ -93,7 +98,7 @@ startup_cpu_stress_seconds = 300
 
 This runs temporary CPU load on the EC2 instance after boot so the CloudWatch alarm can move into `ALARM`. Keep this disabled for normal deployments.
 
-## Demo Screenshot
+## Incident Email Screenshot
 
 The system sends a Bedrock-assisted incident email after the alarm event is processed.
 
@@ -127,7 +132,7 @@ terraform apply
 After deployment:
 
 1. Confirm the SNS email subscription.
-2. Run the manual SNS test or enable the short CPU stress demo.
+2. Run the manual SNS test or enable the short CPU stress validation.
 3. Check the incident email notification.
 4. Review Lambda logs:
 
@@ -146,6 +151,10 @@ terraform init -backend=false
 terraform validate
 ```
 
+GitHub Actions also runs Bandit against the Lambda handler and Checkov against the Terraform configuration.
+
+Operational response notes are documented in [docs/runbook.md](docs/runbook.md).
+
 ## Security Notes
 
 - Terraform state files and local variable files are excluded from version control.
@@ -153,7 +162,7 @@ terraform validate
 - IMDSv2 is enforced on the monitored EC2 instance.
 - Lambda permissions are scoped to CloudWatch Logs, the notification SNS topic, and the configured Bedrock resources.
 - Bedrock Marketplace read/subscribe permissions use `Resource = "*"` because model access activation can require account-level Marketplace APIs.
-- The project uses the default VPC intentionally for a low-cost demo. A production version should use a dedicated VPC, private subnets, VPC endpoints, and stricter egress controls.
+- The project uses the default VPC intentionally for low-cost validation. A production version should use a dedicated VPC, private subnets, VPC endpoints, and stricter egress controls.
 
 ## Cleanup
 

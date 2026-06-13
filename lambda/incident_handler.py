@@ -82,7 +82,7 @@ def extract_alarm_data(alarm_payload, record):
     state_reason = alarm_payload.get("NewStateReason", "No state reason provided")
     current_value = extract_current_value(state_reason)
 
-    return {
+    alarm_data = {
         "alarm_name": alarm_payload.get("AlarmName", "unknown"),
         "instance_id": instance_id,
         "metric_name": trigger.get("MetricName", "unknown"),
@@ -99,6 +99,9 @@ def extract_alarm_data(alarm_payload, record):
             datetime.now(timezone.utc).isoformat()
         )
     }
+
+    alarm_data["severity"] = determine_severity(alarm_data)
+    return alarm_data
 
 
 def extract_current_value(state_reason):
@@ -117,6 +120,42 @@ def extract_current_value(state_reason):
         return "not provided"
 
 
+def parse_number(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def determine_severity(alarm_data):
+    state = str(alarm_data.get("state", "")).upper()
+    current_value = parse_number(alarm_data.get("current_value"))
+    threshold = parse_number(alarm_data.get("threshold"))
+
+    if state == "OK":
+        return "LOW"
+
+    if state == "INSUFFICIENT_DATA":
+        return "UNKNOWN"
+
+    if state != "ALARM":
+        return "UNKNOWN"
+
+    if current_value is None or threshold is None:
+        return "UNKNOWN"
+
+    if alarm_data.get("metric_name") == "CPUUtilization" and current_value >= 90:
+        return "HIGH"
+
+    if current_value >= threshold * 1.5:
+        return "HIGH"
+
+    if current_value >= threshold:
+        return "MEDIUM"
+
+    return "LOW"
+
+
 def generate_bedrock_summary(alarm_data):
     prompt = f"""
 You are an AWS Site Reliability Engineer assistant.
@@ -132,6 +171,7 @@ A real CloudWatch alarm has fired with the following exact details:
 - Current Value: {alarm_data['current_value']}
 - Alarm State: {alarm_data['state']}
 - Previous State: {alarm_data['previous_state']}
+- Calculated Severity: {alarm_data['severity']}
 - Region: {alarm_data['region']}
 - Timestamp: {alarm_data['timestamp']}
 - CloudWatch Reason: {alarm_data['reason']}
@@ -141,7 +181,7 @@ Using ONLY the information above, provide:
 1. SUMMARY: 2 sentences max explaining what is happening to this specific resource.
 2. LIKELY CAUSE: 1-2 sentences based only on the metric, threshold, and alarm reason.
 3. IMMEDIATE ACTIONS: Numbered list, max 5 steps, specific to this metric.
-4. SEVERITY: LOW / MEDIUM / HIGH. If current value is not provided, say UNKNOWN.
+4. SEVERITY: Use the calculated severity unless the alarm details clearly justify a lower severity.
 
 RULES:
 - Do not mention AWS services unrelated to this metric.
@@ -218,6 +258,7 @@ State: {alarm_data['state']}
 Previous State: {alarm_data['previous_state']}
 Threshold: {alarm_data['threshold']}
 Current Value: {alarm_data['current_value']}
+Calculated Severity: {alarm_data['severity']}
 Region: {alarm_data['region']}
 Timestamp: {alarm_data['timestamp']}
 

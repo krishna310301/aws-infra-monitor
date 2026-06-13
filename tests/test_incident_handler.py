@@ -60,6 +60,51 @@ class IncidentHandlerTests(unittest.TestCase):
         self.assertEqual(alarm["instance_id"], "i-1234567890")
         self.assertEqual(alarm["metric_name"], "CPUUtilization")
         self.assertEqual(alarm["current_value"], "91.5")
+        self.assertEqual(alarm["severity"], "HIGH")
+
+    def test_determine_severity_maps_threshold_breach_to_medium(self):
+        handler = load_incident_handler()
+
+        severity = handler.determine_severity({
+            "state": "ALARM",
+            "metric_name": "CPUUtilization",
+            "current_value": "75",
+            "threshold": 70,
+        })
+
+        self.assertEqual(severity, "MEDIUM")
+
+    def test_determine_severity_maps_recovery_to_low(self):
+        handler = load_incident_handler()
+
+        severity = handler.determine_severity({
+            "state": "OK",
+            "metric_name": "CPUUtilization",
+            "current_value": "21",
+            "threshold": 70,
+        })
+
+        self.assertEqual(severity, "LOW")
+
+    def test_format_notification_includes_calculated_severity(self):
+        handler = load_incident_handler()
+
+        message = handler.format_notification({
+            "alarm_name": "high-cpu",
+            "instance_id": "i-1234567890",
+            "metric_name": "CPUUtilization",
+            "namespace": "AWS/EC2",
+            "state": "ALARM",
+            "previous_state": "OK",
+            "threshold": 70,
+            "current_value": "91.5",
+            "severity": "HIGH",
+            "region": "us-east-1",
+            "timestamp": "2026-06-07T00:00:00Z",
+            "reason": "Threshold Crossed: [91.5]",
+        }, "SUMMARY: CPU alarm fired.")
+
+        self.assertIn("Calculated Severity: HIGH", message)
 
     def test_validate_bedrock_response_falls_back_on_generic_text(self):
         handler = load_incident_handler()
